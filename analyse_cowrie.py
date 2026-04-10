@@ -247,6 +247,21 @@ def main():
         else:
             out.write("None flagged.\n")
 
+summary = {
+    "unique_sessions": len(sessions),
+    "top_ips": dict(src_ips.most_common(5)),
+    "top_usernames": dict(usernames.most_common(5)),
+    "top_passwords": dict(passwords.most_common(5)),
+    "top_commands": dict(commands.most_common(5)),
+    "command_categories": dict(command_categories),
+    "bruteforce_flagged": bruteforce_flagged
+}
+
+with open("analysis_summary.json", "w", encoding="utf-8") as json_out:
+    json.dump(summary, json_out, indent=4)
+
+print("JSON summary saved to analysis_summary.json")
+
     print("\nAnalysis complete. Results saved to analysis_summary.txt\n")
 
 
