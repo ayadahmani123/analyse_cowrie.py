@@ -119,11 +119,10 @@ def main():   #Counters for frequency analysis
 
     hourly_attacks = Counter()
     command_categories = Counter()
-    ip_user_map = defaultdict(set)   #Store relationships between IPs and 
-behaviour
+    ip_user_map = defaultdict(set) #Store relationships for IPs and behaviour
     ip_password_map = defaultdict(set)
     ip_timestamps = defaultdict(list)
-#read cowrie log file
+   #Read cowrie log file
     with open(LOG_FILE, "r", encoding="utf-8") as f:
         for line in f:
             try:
@@ -149,8 +148,7 @@ behaviour
                     if src_ip:
                         ip_timestamps[src_ip].append(ts)
 
-            if event_id == "cowrie.login.failed":  #handled failed login 
-attempts
+            if event_id == "cowrie.login.failed": #handled failed login attempts
                 if src_ip:
                     src_ips[src_ip] += 1
                 if username:
@@ -160,8 +158,7 @@ attempts
                     passwords[password] += 1
                     ip_password_map[src_ip].add(password)
 
-            if event_id == "cowrie.command.input":   #handle commands 
-executed by attacker
+            if event_id == "cowrie.command.input": #handle commands executed attacker
                 if command:
                     commands[command] += 1
                     category = classify_command(command)
